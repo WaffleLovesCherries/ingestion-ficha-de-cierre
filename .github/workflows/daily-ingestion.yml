@@ -8,10 +8,21 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
+    environment: main
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Debug environment variables
+      env: 
+        BIG_BROTHER_WATCHING: ${{ vars.BIG_BROTHER_WATCHING }} 
+        AUTH: ${{ secrets.AUTH }} 
+        SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}
+        
+      run: |
+        echo "AUTH is set: $([[ -n "$AUTH" ]] && echo "yes" || echo "no")"
+        echo "SHAREPOINT_URL is set: $([[ -n "$SHAREPOINT_URL" ]] && echo "yes" || echo "no")"
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -23,19 +34,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Debug environment variables
-      env: 
-        BIG_BROTHER_WATCHING: ${{ vars.BIG_BROTHER_WATCHING }} 
-        AUTH: ${{ secrets.AUTH }} 
-        SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}
-      run: |
-        echo "AUTH is set: $([[ -n "$AUTH" ]] && echo "yes" || echo "no")"
-        echo "SHAREPOINT_URL is set: $([[ -n "$SHAREPOINT_URL" ]] && echo "yes" || echo "no")"
-
         
     - name: Run Python script
       env: 
         BIG_BROTHER_WATCHING: ${{ vars.BIG_BROTHER_WATCHING }} 
         AUTH: ${{ secrets.AUTH }} 
         SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}
+        
       run: python ingestion.py

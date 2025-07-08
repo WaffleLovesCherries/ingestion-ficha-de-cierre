@@ -16,7 +16,7 @@ Este proyecto contiene scripts diseñados para automatizar y optimizar el proces
 
 ## Requisitos
 
-- Python 3.x (u otro entorno requerido, según el script)
+- Python 3.12+
 - Dependencias necesarias especificadas en el proyecto
 
 ## Licencia

@@ -25,3 +25,7 @@ jobs:
         
     - name: Run Python script
       run: python ingestion.py
+      env: 
+        BIG_BROTHER_WATCHING: ${{ vars.BIG_BROTHER_WATCHING }} 
+        AUTH: ${{ secrets.AUTH }} 
+        SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}

@@ -1,0 +1,5 @@
+pandas
+numpy
+openpyxl
+python-dotenv
+office365-rest-python-client

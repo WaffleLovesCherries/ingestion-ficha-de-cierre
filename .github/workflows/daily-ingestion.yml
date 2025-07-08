@@ -41,9 +41,4 @@ jobs:
         AUTH: ${{ secrets.AUTH }} 
         SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}
         
-      run: python ingestion.py || {
-        echo "First attempt failed, waiting 15 minutes..."
-        sleep 900
-        echo "Retrying..."
-        python ingestion.py
-      }
+      run: python ingestion.py

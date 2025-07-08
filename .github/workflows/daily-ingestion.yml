@@ -22,6 +22,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+
+    - name: Debug environment variables
+      run: |
+        echo "AUTH is set: $([[ -n "$AUTH" ]] && echo "yes" || echo "no")"
+        echo "SHAREPOINT_URL is set: $([[ -n "$SHAREPOINT_URL" ]] && echo "yes" || echo "no")"
+      env: 
+        BIG_BROTHER_WATCHING: ${{ secrets.BIG_BROTHER_WATCHING }} 
+        AUTH: ${{ secrets.AUTH }} 
+        SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}
+
         
     - name: Run Python script
       run: python ingestion.py

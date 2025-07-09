@@ -1,163 +1,22 @@
-import os
 import io
 import json
-import re
+import os
 import openpyxl as px
-
-from typing import BinaryIO, Union
+import pandas as pd
 
 from multiprocessing import cpu_count
 from multiprocessing.pool import ThreadPool
-
-from operator import itemgetter
-from dotenv import load_dotenv
-from openpyxl import load_workbook
 from office365.runtime.auth.authentication_context import AuthenticationContext
 from office365.sharepoint.client_context import ClientContext
 from office365.sharepoint.files.file import File
-
+from operator import itemgetter
 from pandas import DataFrame
-from typing import Callable, Optional, Any, Dict, List, Tuple
-from openpyxl.workbook.workbook import Workbook
-from typing import Literal
-import pandas as pd
+from typing import Any, BinaryIO, Dict, List, Literal, Optional, Tuple, Union
 
-REPLACEMENTS = {
-    'á': 'a', 
-    'é': 'e', 
-    'í': 'i', 
-    'ó': 'o', 
-    'ú': 'u', 
-    'ü': 'u',
-    'ñ': 'n'
-}
+from .env_utils import load_environment_variables
+from .excel_utils import wbs_check, setter
 
-def to_bool(value: str) -> bool:
-    """Convert string to boolean.
-    Accepts: 'true', 'false', '1', '0', 'yes', 'no', 'on', 'off' (case insensitive)
-    Parameters:
-        value (str): The string to convert to boolean.
-    Returns:
-        out (bool): The converted boolean value.
-    Raises:
-        ValueError: If the string cannot be converted to a boolean.
-    """
-    if isinstance(value, bool): return value
-    if value.lower() in ('true', '1', 'yes', 'on', 't', 'y'): return True
-    elif value.lower() in ('false', '0', 'no', 'off', 'f', 'n'): return False
-    else: raise ValueError(f"Cannot convert '{value}' to boolean")
-
-def clean_str(value: str, allow_chars: str|list = None) -> str:
-    """Trim a string to remove unwanted characters.
-    Parameters:
-        value (str): The string to trim.
-        allow_chars (str|list): Characters to keep in the string. If None, only alphanumeric characters are kept.
-    Returns:
-        out (str): The trimmed string.
-    """
-    if allow_chars is None:
-        allow_chars = ''
-    elif isinstance(allow_chars, str):
-        allow_chars = list(allow_chars)
-    
-    pattern = f"[^a-záéíóúüñ0-9{''.join(allow_chars)}]"
-    cleaned = re.sub(pattern, '', value.lower())
-
-    for orig, repl in REPLACEMENTS.items():
-        cleaned = cleaned.replace(orig, repl)
-    return cleaned
-    
-def load_environment_variables():
-    """Load environment variables from *.env* file, and optionally from a secret path if `BIG_BROTHER_WATCHING` is set.
-    This is useful for loading sensitive information like API keys or database credentials by protecting them from GitHub Copilot.
-    Raises:
-        ValueError: If the string cannot be converted to a boolean.
-    """
-    load_dotenv(override=True)
-    if os.getenv('BIG_BROTHER_WATCHING'):
-        load_dotenv(os.getenv('SECRET_PATH'), override=True)
-
-
-def setter(data: DataFrame, idx: Any) -> Callable[[str, Any], None]:
-    """
-    Returns a setter function to update a specific row in a DataFrame.
-
-    Parameters:
-        data (DataFrame): The DataFrame to update.
-        idx (Any): The index of the row to update.
-
-    Returns:
-        Callable[[str, Any], None]: A function that sets a value in the specified row and column.
-    """
-    def _set(column: str, value: Any) -> None:
-        data.loc[idx, column] = value
-    return _set
-
-def valid_code(code: Any) -> bool:
-    """
-    Checks if a code string is valid based on predefined prefixes and length.
-
-    Parameters:
-        code (Any): The code to validate.
-
-    Returns:
-        bool: True if the code is valid, False otherwise.
-    """
-    valid_prefixes = ['EDU', 'INC', 'GEO', 'MA', 'SAL', 'DT', 'AFI']
-    code_str = str(code).strip()
-    return any(code_str.startswith(prefix) for prefix in valid_prefixes) and len(code_str) > 4
-
-def wbs_check(workbook: Workbook, set_data: Callable[[str, Any], None]) -> Optional[Dict[str, Any]]:
-    """
-    Extracts relevant information from a WBS Excel workbook.
-
-    Parameters:
-        workbook (Workbook): The openpyxl Workbook object.
-        set_data (Callable[[str, Any], None]): Setter function to update DataFrame.
-
-    Returns:
-        Optional[Dict[str, Any]]: Dictionary with extracted fields or None if not found.
-    """
-    clean_sheetnames = {clean_str(sheet): sheet for sheet in workbook.sheetnames}
-
-    # TODO FULL FIND FOR CODE
-    if 'portada' not in clean_sheetnames: return None
-    codigo = workbook[clean_sheetnames['portada']]['H27'].value
-    if not valid_code(codigo):
-        if 'conexioncronograma' not in clean_sheetnames:
-            print(f"WARNING!!! code: {codigo} FAILED SECOND CHECK")
-            print(clean_sheetnames)
-            return None
-        codigo = workbook[clean_sheetnames['conexioncronograma']]['A2'].value
-        if not valid_code:
-            print(f"WARNING!!! code: {codigo} FAILED SECOND CHECK")
-            print(workbook[clean_sheetnames['portada']].values)
-            return None
-
-    if codigo is None: return None
-    set_data('Codigo', codigo)
-    if 'fichacierre' not in clean_sheetnames: return None
-    ficha_sheet = workbook[clean_sheetnames['fichacierre']]
-    rows: List[List[str]] = []
-    for row in ficha_sheet.values:
-        if any(cell is not None for cell in row):
-            row_values = [str(cell) for cell in row if cell is not None and str(cell).strip() != '']
-            if row_values: rows.append(row_values)
-    if not rows: return None
-    ficha: Dict[str, Any] = {'Codigo':codigo}
-    for row in rows:
-        if len(row) < 2: continue
-        header = clean_str(row[0])
-        value = ''.join(row[1:])
-        match header:
-            case 'retos': ficha['Retos'] = value
-            case 'accionesdemitigacion': ficha['AccionesDeMitigacion'] = value
-            case 'leccionesaprendidas': ficha['LeccionesAprendidas'] = value
-    if len(ficha) <= 1: return None
-    set_data('FichaCierre', True)
-    return ficha
-
-class SharepointLoader (ClientContext):
+class SharepointLoader(ClientContext):
     """
     SharepointLoader is a class that extends ClientContext to interact with SharePoint.
     It initializes the client context with the SharePoint URL and authentication details from environment variables.
@@ -280,27 +139,6 @@ class SharepointLoader (ClientContext):
                 raise ValueError(f"Invalid as_format: {as_format}")
         except Exception as e:
             raise IOError(f"Failed to load file from SharePoint: {e}")
-        """
-        Load a file from the SharePoint site selected.
-        Parameters:
-            file_path (str): Path to the file in SharePoint.
-            as_workbook (bool): If True, return an openpyxl Workbook; otherwise, return a BytesIO buffer.
-        Returns:
-            BinaryIO | px.Workbook: A BytesIO buffer containing the file content, or an openpyxl Workbook if as_workbook is True.
-        Raises:
-            ValueError: If the file path is empty.
-            IOError: If the file cannot be loaded from SharePoint.
-        """
-        if not file_path:
-            raise ValueError("File path cannot be empty.")
-        
-        try:
-            response = File.open_binary(self, file_path)
-            buffer = io.BytesIO(response.content)
-            if as_workbook: return px.load_workbook(buffer, read_only=True, data_only=True)
-            return buffer
-        except Exception as e:
-            raise IOError(f"Failed to load file from SharePoint: {e}")
     
     def save_file(self, file_path: str, buffer: Union[bytes, io.BytesIO]):
         """
@@ -351,8 +189,3 @@ class SharepointLoader (ClientContext):
         filtered_results = [result for result in results if result is not None]
         results_df = DataFrame(filtered_results) if filtered_results else DataFrame()
         return data_copy, results_df
-    
-if __name__ == "__main__":
-    loader = SharepointLoader()
-    files = loader.get_files('/sites/MicrositioProyectosFSD/Documentos compartidos/', ['2. Gestión de Proyecto', '3. Proyectos cerrados'])
-    print(len(files))

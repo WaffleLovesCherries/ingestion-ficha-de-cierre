@@ -8,26 +8,16 @@ on:
 jobs:
   run-script:
     runs-on: ubuntu-latest
-    environment: main
+    environment: sharepoint
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Debug environment variables
-      env: 
-        BIG_BROTHER_WATCHING: ${{ vars.BIG_BROTHER_WATCHING }} 
-        AUTH: ${{ secrets.AUTH }} 
-        SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}
-        
-      run: |
-        echo "AUTH is set: $([[ -n "$AUTH" ]] && echo "yes" || echo "no")"
-        echo "SHAREPOINT_URL is set: $([[ -n "$SHAREPOINT_URL" ]] && echo "yes" || echo "no")"
       
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.13'
+        python-version: '3.10'
         
     - name: Install dependencies
       run: |
@@ -37,8 +27,18 @@ jobs:
         
     - name: Run Python script
       env: 
-        BIG_BROTHER_WATCHING: ${{ vars.BIG_BROTHER_WATCHING }} 
+        # Variables
+        BIG_BROTHER_WATCHING: ${{ vars.BIG_BROTHER_WATCHING }}
+        CHARACTER_REPLACEMENTS: ${{ vars.CHARACTER_REPLACEMENTS }}
+        VALID_CODE_PREFIXES: ${{ vars.VALID_CODE_PREFIXES }}
+        MIN_CODE_LENGTH: ${{ vars.MIN_CODE_LENGTH }}
+        SHAREPOINT_TARGET_FOLDERS: ${{ vars.SHAREPOINT_TARGET_FOLDERS }}
+        SHAREPOINT_OBSERVED_PATH: ${{ vars.SHAREPOINT_OBSERVED_PATH }}
+        SHAREPOINT_RECORDS_PATH: ${{ vars.SHAREPOINT_RECORDS_PATH }}
+        
+        # Secrets
         AUTH: ${{ secrets.AUTH }} 
+        SHAREPOINT_ROOT_PATH: ${{ secrets.SHAREPOINT_ROOT_PATH }} 
         SHAREPOINT_URL: ${{ secrets.SHAREPOINT_URL }}
         
-      run: python ingestion.py
+      run: python ingestion/ingestion.py

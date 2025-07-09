@@ -47,6 +47,7 @@ def wbs_check(workbook: Workbook, set_data: Callable[[str, Any], None]) -> Optio
             return None
 
     if codigo is None: return None
+    codigo = str(codigo).strip()
     set_data('Codigo', codigo)
     if 'fichacierre' not in clean_sheetnames: return None
     ficha_sheet = workbook[clean_sheetnames['fichacierre']]
